@@ -12,19 +12,19 @@ Usage: import the module (see Jupyter notebooks for examples), or run from
        the command line as such:
 
     # Train a new model starting from pre-trained COCO weights
-    python3 balloon.py train --dataset=/path/to/balloon/dataset --weights=coco
+    python traiv_training.py train --dataset=/path/to/traiv/dataset --weights=coco
 
     # Resume training a model that you had trained earlier
-    python3 balloon.py train --dataset=/path/to/balloon/dataset --weights=last
+    python traiv_training.py train --dataset=/path/to/traiv/dataset --weights=last
 
     # Train a new model starting from ImageNet weights
-    python3 balloon.py train --dataset=/path/to/balloon/dataset --weights=imagenet
+    python traiv_training.py train --dataset=/path/to/traiv/dataset --weights=imagenet
 
     # Apply color splash to an image
-    python3 balloon.py splash --weights=/path/to/weights/file.h5 --image=<URL or path to file>
+    python traiv_training.py splash --weights=/path/to/weights/file.h5 --image=<URL or path to file>
 
     # Apply color splash to video using the last weights you trained
-    python3 balloon.py splash --weights=last --video=<URL or path to file>
+    python traiv_training.py splash --weights=last --video=<URL or path to file>
 """
 
 import os
@@ -54,7 +54,7 @@ DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 ############################################################
 
 
-class BalloonConfig(Config):
+class TraivConfig(Config):
     """Configuration for training on the toy  dataset.
     Derives from the base Config class and overrides some values.
     """
@@ -63,10 +63,10 @@ class BalloonConfig(Config):
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 6
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 1  # Background + balloon
+    NUM_CLASSES = 18 + 1  # Background + balloon
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 100
@@ -79,15 +79,33 @@ class BalloonConfig(Config):
 #  Dataset
 ############################################################
 
-class BalloonDataset(utils.Dataset):
+class TraivDataset(utils.Dataset):
 
-    def load_balloon(self, dataset_dir, subset):
+    def load_place(self, dataset_dir, subset):
         """Load a subset of the Balloon dataset.
         dataset_dir: Root directory of the dataset.
         subset: Subset to load: train or val
         """
         # Add classes. We have only one class to add.
-        self.add_class("balloon", 1, "balloon")
+        self.add_class("traiv", 1, "sand")
+        self.add_class("traiv", 2, "trees")
+        self.add_class("traiv", 3, "water")
+        self.add_class("traiv", 4, "stone")
+        self.add_class("traiv", 5, "grass")
+        self.add_class("traiv", 6, "plants")
+        self.add_class("traiv", 7, "animal")
+        self.add_class("traiv", 8, "snow")
+        self.add_class("traiv", 9, "ruins")
+        self.add_class("traiv", 10, "waterfall")
+        self.add_class("traiv", 11, "old_buildings")
+        self.add_class("traiv", 12, "modern_building")
+        self.add_class("traiv", 13, "bridge")
+        self.add_class("traiv", 14, "street")
+        self.add_class("traiv", 15, "statue")
+        self.add_class("traiv", 16, "glacier")
+        self.add_class("traiv", 17, "mountain")
+        self.add_class("traiv", 18, "galaxy")
+        
 
         # Train or validation dataset?
         assert subset in ["train", "val"]
@@ -109,7 +127,7 @@ class BalloonDataset(utils.Dataset):
         # }
         # We mostly care about the x and y coordinates of each region
         # Note: In VIA 2.0, regions was changed from a dict to a list.
-        annotations = json.load(open(os.path.join(dataset_dir, "via_region_data.json")))
+        annotations = json.load(open(os.path.join(dataset_dir, "Traiv_json.json")))
         annotations = list(annotations.values())  # don't need the dict keys
 
         # The VIA tool saves images in the JSON even if they don't have any
@@ -122,10 +140,32 @@ class BalloonDataset(utils.Dataset):
             # the outline of each object instance. These are stores in the
             # shape_attributes (see json format above)
             # The if condition is needed to support VIA versions 1.x and 2.x.
-            if type(a['regions']) is dict:
-                polygons = [r['shape_attributes'] for r in a['regions'].values()]
-            else:
-                polygons = [r['shape_attributes'] for r in a['regions']] 
+            polygons = [r['shape_attributes'] for r in a['regions']] 
+            objects = [s['region_attributes']['type'] for s in a['regions']]
+            
+            name_dict = {"bottle": 1,"glass": 2,"paper": 3,"trash": 4}
+            type_dict = {
+                "sand": 1, 
+                "trees": 2,
+                "water": 3,
+                "stone": 4,
+                "grass": 5,
+                "plants": 6,
+                "animal": 7,
+                "snow": 8,
+                "ruins": 9,
+                "waterfall": 10,
+                "old_buildings": 11,
+                "modern_building": 12,
+                "bridge": 13,
+                "street": 14,
+                "statue": 15,
+                "glacier": 16,
+                "mountain": 17,
+                "galaxy":18
+            }
+
+            num_ids = [type_dict[a] for a in objects]
 
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
@@ -135,11 +175,12 @@ class BalloonDataset(utils.Dataset):
             height, width = image.shape[:2]
 
             self.add_image(
-                "balloon",
+                "traiv",
                 image_id=a['filename'],  # use file name as a unique image id
                 path=image_path,
                 width=width, height=height,
-                polygons=polygons)
+                polygons=polygons,
+                num_ids=num_ids)
 
     def load_mask(self, image_id):
         """Generate instance masks for an image.
@@ -148,9 +189,9 @@ class BalloonDataset(utils.Dataset):
             one mask per instance.
         class_ids: a 1D array of class IDs of the instance masks.
         """
-        # If not a balloon dataset image, delegate to parent class.
+        # If not a traiv dataset image, delegate to parent class.
         image_info = self.image_info[image_id]
-        if image_info["source"] != "balloon":
+        if image_info["source"] != "traiv":
             return super(self.__class__, self).load_mask(image_id)
 
         # Convert polygons to a bitmap mask of shape
@@ -164,13 +205,16 @@ class BalloonDataset(utils.Dataset):
             mask[rr, cc, i] = 1
 
         # Return mask, and array of class IDs of each instance. Since we have
-        # one class ID only, we return an array of 1s
-        return mask.astype(np.bool), np.ones([mask.shape[-1]], dtype=np.int32)
+        # return ids from loaded place
+        num_ids = info['num_ids']
+        num_ids = np.array(num_ids, dtype=np.int32)
+        return mask.astype(np.bool), num_ids
+        
 
     def image_reference(self, image_id):
         """Return the path of the image."""
         info = self.image_info[image_id]
-        if info["source"] == "balloon":
+        if info["source"] == "traiv":
             return info["path"]
         else:
             super(self.__class__, self).image_reference(image_id)
@@ -179,13 +223,13 @@ class BalloonDataset(utils.Dataset):
 def train(model):
     """Train the model."""
     # Training dataset.
-    dataset_train = BalloonDataset()
-    dataset_train.load_balloon(args.dataset, "train")
+    dataset_train = TraivDataset()
+    dataset_train.load_place(args.dataset, "train")
     dataset_train.prepare()
 
     # Validation dataset
-    dataset_val = BalloonDataset()
-    dataset_val.load_balloon(args.dataset, "val")
+    dataset_val = TraivDataset()
+    dataset_val.TraivDataset(args.dataset, "val")
     dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***
