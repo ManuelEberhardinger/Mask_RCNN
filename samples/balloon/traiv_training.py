@@ -59,7 +59,7 @@ class TraivConfig(Config):
     Derives from the base Config class and overrides some values.
     """
     # Give the configuration a recognizable name
-    NAME = "balloon"
+    NAME = "traiv"
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
@@ -136,6 +136,12 @@ class TraivDataset(utils.Dataset):
 
         # Add images
         for a in annotations:
+            image_path = os.path.join(dataset_dir, a['filename'])
+            
+            # skip files that doesnt exist
+            if not os.path.isfile(image_path):
+                continue
+                
             # Get the x, y coordinaets of points of the polygons that make up
             # the outline of each object instance. These are stores in the
             # shape_attributes (see json format above)
@@ -170,7 +176,6 @@ class TraivDataset(utils.Dataset):
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
-            image_path = os.path.join(dataset_dir, a['filename'])
             image = skimage.io.imread(image_path)
             height, width = image.shape[:2]
 
@@ -229,7 +234,7 @@ def train(model):
 
     # Validation dataset
     dataset_val = TraivDataset()
-    dataset_val.TraivDataset(args.dataset, "val")
+    dataset_val.load_place(args.dataset, "val")
     dataset_val.prepare()
 
     # *** This training schedule is an example. Update to your needs ***
@@ -239,7 +244,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=30,
+                epochs=100,
                 layers='heads')
 
 
@@ -359,7 +364,7 @@ if __name__ == '__main__':
 
     # Configurations
     if args.command == "train":
-        config = BalloonConfig()
+        config = TraivConfig()
     else:
         class InferenceConfig(BalloonConfig):
             # Set batch size to 1 since we'll be running inference on
