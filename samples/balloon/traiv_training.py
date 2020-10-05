@@ -66,13 +66,14 @@ class TraivConfig(Config):
     IMAGES_PER_GPU = 6
 
     # Number of classes (including background)
-    NUM_CLASSES = 18 + 1  # Background + balloon
+    NUM_CLASSES = 14 + 1  # Background + balloon
 
     # Number of training steps per epoch
-    STEPS_PER_EPOCH = 100
+    STEPS_PER_EPOCH = 250
 
     # Skip detections with < 90% confidence
-    DETECTION_MIN_CONFIDENCE = 0.9
+    DETECTION_MIN_CONFIDENCE = 0.7
+
 
 
 ############################################################
@@ -90,21 +91,21 @@ class TraivDataset(utils.Dataset):
         self.add_class("traiv", 1, "sand")
         self.add_class("traiv", 2, "trees")
         self.add_class("traiv", 3, "water")
-        self.add_class("traiv", 4, "stone")
-        self.add_class("traiv", 5, "grass")
-        self.add_class("traiv", 6, "plants")
-        self.add_class("traiv", 7, "animal")
-        self.add_class("traiv", 8, "snow")
-        self.add_class("traiv", 9, "ruins")
-        self.add_class("traiv", 10, "waterfall")
-        self.add_class("traiv", 11, "old_buildings")
-        self.add_class("traiv", 12, "modern_building")
-        self.add_class("traiv", 13, "bridge")
-        self.add_class("traiv", 14, "street")
-        self.add_class("traiv", 15, "statue")
-        self.add_class("traiv", 16, "glacier")
-        self.add_class("traiv", 17, "mountain")
-        self.add_class("traiv", 18, "galaxy")
+        #self.add_class("traiv", 4, "stone")
+        self.add_class("traiv", 4, "grass")
+        self.add_class("traiv", 5, "plants")
+        #self.add_class("traiv", 7, "animal")
+        #self.add_class("traiv", 8, "snow")
+        self.add_class("traiv", 6, "ruins")
+        self.add_class("traiv", 7, "waterfall")
+        self.add_class("traiv", 8, "old_buildings")
+        self.add_class("traiv", 9, "modern_building")
+        self.add_class("traiv", 10, "bridge")
+        self.add_class("traiv", 11, "street")
+        self.add_class("traiv", 12, "statue")
+        self.add_class("traiv", 13, "glacier")
+        self.add_class("traiv", 14, "mountain")
+        #self.add_class("traiv", 15, "galaxy")
         
 
         # Train or validation dataset?
@@ -148,31 +149,43 @@ class TraivDataset(utils.Dataset):
             # The if condition is needed to support VIA versions 1.x and 2.x.
             polygons = [r['shape_attributes'] for r in a['regions']] 
             objects = [s['region_attributes']['type'] for s in a['regions']]
-            
-            name_dict = {"bottle": 1,"glass": 2,"paper": 3,"trash": 4}
+
             type_dict = {
                 "sand": 1, 
                 "trees": 2,
                 "water": 3,
-                "stone": 4,
-                "grass": 5,
-                "plants": 6,
-                "animal": 7,
-                "snow": 8,
-                "ruins": 9,
-                "waterfall": 10,
-                "old_buildings": 11,
-                "modern_building": 12,
-                "bridge": 13,
-                "street": 14,
-                "statue": 15,
-                "glacier": 16,
-                "mountain": 17,
-                "galaxy":18
+                #"stone": 4,
+                "grass": 4,
+                "plants": 5,
+                #"animal": 7,
+                #"snow": 8,
+                "ruins": 6,
+                "waterfall": 7,
+                "old_buildings": 8,
+                "modern_building": 9,
+                "bridge": 10,
+                "street": 11,
+                "statue": 12,
+                "glacier": 13,
+                "mountain": 14,
+                #"galaxy": 15
             }
+            
+            to_remove = ['stone', 'animal', 'snow', 'galaxy']
+            to_remove_idx = []
+            for i, o in enumerate(objects):
+                if o in to_remove:
+                    to_remove_idx.append(i)
+                    
+            for i in reversed(to_remove_idx):
+                del polygons[i]
+                del objects[i]
+                
+            #for o in to_remove:
+            #    del type_dict[o]
 
             num_ids = [type_dict[a] for a in objects]
-
+            
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
@@ -185,8 +198,9 @@ class TraivDataset(utils.Dataset):
                 path=image_path,
                 width=width, height=height,
                 polygons=polygons,
-                num_ids=num_ids)
-
+                num_ids=num_ids)        
+    
+  
     def load_mask(self, image_id):
         """Generate instance masks for an image.
        Returns:
