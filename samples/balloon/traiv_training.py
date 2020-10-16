@@ -105,6 +105,11 @@ class TraivDataset(utils.Dataset):
         self.add_class("traiv", 16, "glacier")
         self.add_class("traiv", 17, "mountain")
         self.add_class("traiv", 18, "galaxy")
+        self.add_class("traiv", 19, "city")
+        self.add_class("traiv", 20, "scary")
+        self.add_class("traiv", 21, "attraction")
+        self.add_class("traiv", 22, "person")
+        self.add_class("traiv", 23, "island")
         
 
         # Train or validation dataset?
@@ -168,10 +173,19 @@ class TraivDataset(utils.Dataset):
                 "statue": 15,
                 "glacier": 16,
                 "mountain": 17,
-                "galaxy":18
+                "galaxy":18,
+                "city": 19,
+                "scary": 20,
+                "attraction": 21,
+                "person": 22,
+                "island": 23
             }
 
             num_ids = [type_dict[a] for a in objects]
+            
+            # skip picture if nothing is annotated
+            if len(num_ids) == 0:
+                continue
 
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
